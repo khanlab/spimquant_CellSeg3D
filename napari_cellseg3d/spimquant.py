@@ -36,6 +36,7 @@ def preprocess_to_3d_tiles(dataset_ref: DatasetReference,
     3d tiles of a given size;
     If the tile_width is None, then the slice is not tiled"""
     akd = dataset_ref.datapoint_refs
+
     for imid in akd:
         im = akd[imid].read_as_np(dataset_ref.im_read_setting)
         if ch is not None:
