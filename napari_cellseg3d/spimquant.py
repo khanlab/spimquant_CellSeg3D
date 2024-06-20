@@ -13,6 +13,7 @@ import logging
 import monai
 from spimquant.cvpl_tools.dataset_reference import DatasetReference
 from dataclasses import dataclass
+from .func_variants import normalize
 
 
 @dataclass
