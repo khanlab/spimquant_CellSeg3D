@@ -156,7 +156,7 @@ def inference_on_np_batch(config: CellSeg3DModelConfig, im3d_np_batch, roi_size,
         model.eval()
         val_data = np.float32(im3d_np_batch)
         val_inputs = torch.from_numpy(val_data).to(config.device)
-        rg = config.rg
+        rg = config.input_brightness_range
         if rg is None:
             for i in range(val_inputs.shape[0]):
                 for j in range(val_inputs.shape[1]):
