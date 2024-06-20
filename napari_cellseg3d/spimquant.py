@@ -220,4 +220,5 @@ def create_model(config: CellSeg3DModelConfig):
     model.to(config.device)
     weights = torch.load(config.model_weight_path, map_location=config.device)
     model.load_state_dict(weights, strict=True)
+    return model
 
