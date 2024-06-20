@@ -4,43 +4,23 @@ import numpy as np
 from napari_cellseg3d.utils import remap_image
 from monai.inferers import sliding_window_inference
 from monai.transforms import AsDiscrete
-from .func_variants import normalize_inplace
+from .func_variants import normalize
 
 
-DEVICE = 'cuda'
-
-
-def create_model(train_config, weights):
-    model = WNet(
-        in_channels=train_config.in_channels,
-        out_channels=train_config.out_channels,
-        num_classes=train_config.num_classes,
-        dropout=train_config.dropout,
-    )
-    model.to(DEVICE)
-    model.load_state_dict(weights, strict=True)
-    return model
-
-
-def inference_on(model, image_files, roi_size):
+def inference_on_np(model, im3d_np, roi_size, rg, device):
     """
-    :param model:
-    :param image_files: one file or many files
-    :return:
+    im3d_np can be any 3d array convertible to float32
     """
     with torch.no_grad():
         model.eval()
         for _k, val_data_file in enumerate(image_files):
-            val_data = np.float32(np.load(val_data_file)[None, None, :])
-            val_inputs = torch.from_numpy(val_data).to(DEVICE)
-
-            # normalize val_inputs across channels
-            for i in range(val_inputs.shape[0]):
-                for j in range(val_inputs.shape[1]):
-                    im_max = val_inputs.max()
-                    im_min = val_inputs.min()
-                    normalize_inplace(val_inputs[i, j], im_max=im_max, im_min=im_min)
-            print(f"Val inputs shape: {val_inputs.shape}")
+            val_data = np.float32(im3d_np[None, None, :])
+            val_inputs = torch.from_numpy(val_data).to(device)
+            if rg is None:
+                im_min, im_max = val_inputs.min(), val_inputs.max()
+            else:
+                im_min, im_max = rg
+            normalize(val_inputs[0, 0], im_max=im_max, im_min=im_min, inplace=True)
             val_outputs = sliding_window_inference(
                 val_inputs,
                 roi_size=roi_size,
@@ -62,5 +42,16 @@ def inference_on(model, image_files, roi_size):
             #     progress=True,
             # )
             yield val_outputs
+
+
+def inference_on(model, image_files, roi_size, rg, device):
+    """
+    :param model:
+    :param image_files: one file or many files
+    :return:
+    """
+    for _k, val_data_file in enumerate(image_files):
+        val_outputs = inference_on_np(model, np.load(val_data_file), roi_size, rg, device)
+        yield val_outputs
 
 

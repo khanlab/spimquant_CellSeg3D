@@ -17,7 +17,7 @@ def normalize(
     with torch.no_grad():
         if not inplace:
             if isinstance(image, np.ndarray):
-                image = np.copy(image)
+                raise ValueError('Does not support inplace numpy operation!')
             else:
                 image = torch.clone(image)
         im_view = image.view(-1)
