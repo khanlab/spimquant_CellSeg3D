@@ -1,5 +1,6 @@
 from pathlib import Path
 from napari_cellseg3d.dev_scripts import colab_training as c
+from napari_cellseg3d.code_models.models.wnet.model import WNet
 from napari_cellseg3d.config import WNetTrainingWorkerConfig, WandBConfig, WeightsInfo, PRETRAINED_WEIGHTS_DIR
 import torch
 import numpy as np
