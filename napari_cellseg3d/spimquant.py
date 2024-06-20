@@ -132,6 +132,7 @@ def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str,
         n_cuts_weight=.5,
         rec_loss_weight=.005,
         rec_loss='MSE',
+        device=device,
     )
     train_model(config)
 
