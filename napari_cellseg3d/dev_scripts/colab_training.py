@@ -490,7 +490,7 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
                     elif isinstance(criterionW, nn.BCELoss):
                         reconstruction_loss = criterionW(
                             torch.sigmoid(dec),
-                            self.normalize(image_batch, 1., False),
+                            normalize(image_batch, 100., 0., new_max=1., inplace=False)
                         )
 
                     epoch_rec_loss += reconstruction_loss.item()
