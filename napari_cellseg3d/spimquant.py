@@ -15,19 +15,23 @@ from dataclasses import dataclass
 
 
 @dataclass
-class TrainConfig:
+class CellSeg3DTrainingRecord:
     trainset: DatasetReference
     scratch_folder: str  # the folder where intermediate files for training will be written to
     result_folder: str  # result folder for output
+    in_channels: int = 1
+    out_channels: int = 1
+    num_classes: int = 10
+    dropout: float = 0.65
     IM_TRAIN_CHANNEL: int = 0  # the channel of input image to train on
-    clamp_max: float = 1000.
-    clamp_min: float = 0.
     input_brightness_range: tuple[float, float] = (0., 1000.)
     number_of_epochs: int = 5
     n_cuts_weight: float = .5
     rec_loss_weight: float = .005
     rec_loss: str = 'MSE'
     device: str = 'cpu'
+    model_weight_path: str = None
+    post_processing_code: str = None
 
 
 def preprocess_to_3d_tiles(dataset_ref: DatasetReference,
@@ -46,7 +50,7 @@ def preprocess_to_3d_tiles(dataset_ref: DatasetReference,
         np.save(f'{out_prefix}/{imid}.npy', im)
 
 
-def train_model(config: TrainConfig):
+def train_model(config: CellSeg3DModelConfig):
     PROCESSED_SLICE_FOLDER = f'{config.scratch_folder}/cellseg3d_train_inputs'
     if os.path.exists(PROCESSED_SLICE_FOLDER):
         shutil.rmtree(PROCESSED_SLICE_FOLDER)
@@ -55,15 +59,15 @@ def train_model(config: TrainConfig):
         shutil.rmtree(config.result_folder)
     os.mkdir(config.result_folder)
 
+    clamp_min, clamp_max = config.input_brightness_range
     preprocess_to_3d_tiles(config.trainset, PROCESSED_SLICE_FOLDER,
                                  config.IM_TRAIN_CHANNEL,
-                                 config.clamp_max, config.clamp_min)
+                                 clamp_max, clamp_min)
 
     do_validation = False
 
     batch_size = 4
     learning_rate = 2e-5
-    num_classes = 10
     weight_decay = 0.01
     validation_frequency = 2
     intensity_sigma = 1.0
@@ -92,7 +96,10 @@ def train_model(config: TrainConfig):
         train_data_dict=create_dataset(train_data_folder),
         eval_volume_dict=None,
         # advanced
-        num_classes=num_classes,
+        in_channels=config.in_channels,
+        out_channels=config.out_channels,
+        num_classes=config.num_classes,
+        dropout=config.dropout,
         weight_decay=weight_decay,
         intensity_sigma=intensity_sigma,
         spatial_sigma=spatial_sigma,
@@ -110,6 +117,8 @@ def train_model(config: TrainConfig):
     worker = c.get_colab_worker(worker_config=train_config, wandb_config=wandb_config)
     for epoch_loss in worker.train():
         continue
+    config.model_weight_path = f'{config.result_folder}/wnet.pth'
+    return config
 
 
 def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str, result_folder: str, device: str):
@@ -120,13 +129,11 @@ def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str,
         MAX_BRIGHTNESS = 500.
         rec_loss_weight = .2
 
-    config = TrainConfig(
+    config = CellSeg3DModelConfig(
         trainset=trainset,
         scratch_folder=scratch_folder,
         result_folder=result_folder,
         IM_TRAIN_CHANNEL=channel,
-        clamp_max=MAX_BRIGHTNESS,
-        clamp_min=0.,
         input_brightness_range=(0., MAX_BRIGHTNESS),
         number_of_epochs=10,
         n_cuts_weight=.5,
@@ -135,4 +142,81 @@ def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str,
         device=device,
     )
     train_model(config)
+    return config
+
+
+def inference_on_np_batch(config: CellSeg3DModelConfig, im3d_np_batch, roi_size, model=None):
+    """
+    im3d_np is 5d array convertible to float32, its dimensions are (batch, in_channel, z, y, x)
+    """
+    if model is None:
+        model = create_model(config)
+    with torch.no_grad():
+        model.eval()
+        val_data = np.float32(im3d_np)
+        val_inputs = torch.from_numpy(val_data).to(config.device)
+        rg = config.rg
+        if rg is None:
+            for i in range(val_inputs.shape[0]):
+                for j in range(val_inputs.shape[1]):
+                    im_min, im_max = val_inputs.min(), val_inputs.max()
+                    normalize(val_inputs[i, j], im_max=im_max, im_min=im_min, inplace=True)
+        else:
+            im_min, im_max = rg
+            normalize(val_inputs, im_max=im_max, im_min=im_min, inplace=True)
+        val_outputs = sliding_window_inference(
+            val_inputs,
+            roi_size=roi_size,
+            sw_batch_size=1,
+            predictor=model.forward_encoder,
+            overlap=0.1,
+            mode="gaussian",
+            sigma_scale=0.01,
+            progress=True,
+        )
+        # val_decoder_outputs = sliding_window_inference(
+        #     val_outputs,
+        #     roi_size=roi_size,
+        #     sw_batch_size=1,
+        #     predictor=model.forward_decoder,
+        #     overlap=0.1,
+        #     mode="gaussian",
+        #     sigma_scale=0.01,
+        #     progress=True,
+        # )
+        return val_outputs
+
+
+def inference_on_np3d(config: CellSeg3DModelConfig, im3d_np, roi_size, model=None):
+    """
+    im3d_np is 3d array convertible to float32, its dimensions are (z, y, x)
+    """
+    if model is None:
+        model = create_model(config)
+    return inference_on_np_batch(config, im3d_np[None, None], roi_size, model)
+
+
+def inference_on(config: CellSeg3DModelConfig, im3d_np_batch, roi_size, model=None):
+    """
+    :param model:
+    :param image_files: one file or many files
+    :return:
+    """
+    if model is None:
+        model = create_model(config)
+    for _k, val_data_file in enumerate(image_files):
+        val_outputs = inference_on_np3d(model, np.load(val_data_file), roi_size, model)
+        yield val_outputs
+
+
+def create_model(config: CellSeg3DTrainingRecord):
+    model = WNet(
+        in_channels=config.in_channels,
+        out_channels=config.out_channels,
+        num_classes=config.num_classes,
+        dropout=config.dropout,
+    )
+    model.to(config.device)
+    weights = torch.load(config.model_weight_path, map_location=config.device),
+    model.load_state_dict(weights, strict=True)
 
