@@ -154,7 +154,7 @@ def inference_on_np_batch(config: CellSeg3DModelConfig, im3d_np_batch, roi_size,
         model = create_model(config)
     with torch.no_grad():
         model.eval()
-        val_data = np.float32(im3d_np)
+        val_data = np.float32(im3d_np_batch)
         val_inputs = torch.from_numpy(val_data).to(config.device)
         rg = config.rg
         if rg is None:
