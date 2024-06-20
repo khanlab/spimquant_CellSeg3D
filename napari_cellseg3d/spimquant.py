@@ -14,6 +14,7 @@ import monai
 from spimquant.cvpl_tools.dataset_reference import DatasetReference
 from dataclasses import dataclass
 from .func_variants import normalize
+from monai.inferers import sliding_window_inference
 
 
 @dataclass
