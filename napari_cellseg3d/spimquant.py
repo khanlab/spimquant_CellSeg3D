@@ -111,37 +111,25 @@ def train_model(config: TrainConfig):
         continue
 
 
-def train_channel0(trainset: DatasetReference, scratch_folder: str, result_folder: str):
-    MAX_BRIGHTNESS = 1000.
+def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str, result_folder: str, device: str):
+    if channel == 0:
+        MAX_BRIGHTNESS = 1000.
+        rec_loss_weight = .005
+    else:
+        MAX_BRIGHTNESS = 500.
+        rec_loss_weight = .2
+
     config = TrainConfig(
         trainset=trainset,
         scratch_folder=scratch_folder,
         result_folder=result_folder,
-        IM_TRAIN_CHANNEL=0,
+        IM_TRAIN_CHANNEL=channel,
         clamp_max=MAX_BRIGHTNESS,
         clamp_min=0.,
         input_brightness_range=(0., MAX_BRIGHTNESS),
         number_of_epochs=10,
         n_cuts_weight=.5,
         rec_loss_weight=.005,
-        rec_loss='MSE',
-    )
-    train_model(config)
-
-
-def train_channel1(trainset: DatasetReference, scratch_folder: str, result_folder: str):
-    MAX_BRIGHTNESS = 500.
-    config = TrainConfig(
-        trainset=trainset,
-        scratch_folder=scratch_folder,
-        result_folder=result_folder,
-        IM_TRAIN_CHANNEL=1,
-        clamp_max=MAX_BRIGHTNESS,
-        clamp_min=0.,
-        input_brightness_range=(0., MAX_BRIGHTNESS),
-        number_of_epochs=10,
-        n_cuts_weight=.5,
-        rec_loss_weight=.2,
         rec_loss='MSE',
     )
     train_model(config)
