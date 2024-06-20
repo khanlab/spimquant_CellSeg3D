@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class CellSeg3DTrainingRecord:
+class CellSeg3DModelConfig:
     trainset: DatasetReference
     scratch_folder: str  # the folder where intermediate files for training will be written to
     result_folder: str  # result folder for output
@@ -209,7 +209,7 @@ def inference_on(config: CellSeg3DModelConfig, im3d_np_batch, roi_size, model=No
         yield val_outputs
 
 
-def create_model(config: CellSeg3DTrainingRecord):
+def create_model(config: CellSeg3DModelConfig):
     model = WNet(
         in_channels=config.in_channels,
         out_channels=config.out_channels,
