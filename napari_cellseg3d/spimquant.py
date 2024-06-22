@@ -124,7 +124,8 @@ def train_model(config: CellSeg3DModelConfig):
     return config
 
 
-def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str, result_folder: str, device: str):
+def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str, result_folder: str, device: str,
+                  nepoch=20, num_classes=5):
     if channel == 0:
         MAX_BRIGHTNESS = 1000.
         rec_loss_weight = .005
@@ -143,6 +144,7 @@ def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str,
         rec_loss_weight=.005,
         rec_loss='MSE',
         device=device,
+        num_classes=num_classes,
     )
     train_model(config)
     return config
@@ -199,7 +201,7 @@ def inference_on_np3d(config: CellSeg3DModelConfig, im3d_np, roi_size, model=Non
     return inference_on_np_batch(config, im3d_np[None, None], roi_size, model)
 
 
-def inference_on(config: CellSeg3DModelConfig, im3d_np_batch, roi_size, model=None):
+def inference_on(config: CellSeg3DModelConfig, image_files, roi_size, model=None):
     """
     :param model:
     :param image_files: one file or many files
