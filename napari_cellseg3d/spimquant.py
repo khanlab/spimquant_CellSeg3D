@@ -127,21 +127,23 @@ def train_model(config: CellSeg3DModelConfig):
 def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str, result_folder: str, device: str,
                   nepoch=20, num_classes=5):
     if channel == 0:
+        MIN_BRIGHTNESS = 0.
         MAX_BRIGHTNESS = 1000.
         rec_loss_weight = .005
     else:
-        MAX_BRIGHTNESS = 500.
-        rec_loss_weight = .2
+        MIN_BRIGHTNESS = 300.
+        MAX_BRIGHTNESS = 1000.
+        rec_loss_weight = .005
 
     config = CellSeg3DModelConfig(
         trainset=trainset,
         scratch_folder=scratch_folder,
         result_folder=result_folder,
         IM_TRAIN_CHANNEL=channel,
-        input_brightness_range=(0., MAX_BRIGHTNESS),
+        input_brightness_range=(MIN_BRIGHTNESS, MAX_BRIGHTNESS),
         number_of_epochs=nepoch,
         n_cuts_weight=.5,
-        rec_loss_weight=.005,
+        rec_loss_weight=rec_loss_weight,
         rec_loss='MSE',
         device=device,
         num_classes=num_classes,
