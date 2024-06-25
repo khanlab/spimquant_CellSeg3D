@@ -39,6 +39,7 @@ from napari_cellseg3d.code_models.worker_training import TrainingWorkerBase
 from napari_cellseg3d.code_models.workers_utils import (
     PRETRAINED_WEIGHTS_DIR,
 )
+from ..func_variants import normalize
 
 logger = utils.LOGGER
 VERBOSE_SCHEDULER = True
@@ -84,7 +85,6 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
         self.dice_metric = DiceMetric(
             include_background=False, reduction="mean", get_not_nans=False
         )
-        self.normalize_function = utils.remap_image
         self.start_time = time.time()
         self.ncuts_losses = []
         self.rec_losses = []
@@ -96,8 +96,22 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
         self.eval_dataloader: DataLoader = None
         self.data_shape = None
 
+    def normalize(self, image_batch, new_max, inplace: bool):
+        rg = self.config.input_brightness_range
+        if rg is None:
+            im_min, im_max = image_batch.min(), image_batch.max()
+        else:
+            im_min, im_max = rg
+        normalize(image_batch, im_max, im_min, new_max, inplace=inplace)
+
     def log(self, text):
         """Log a message to the logger and to wandb if installed."""
+        # import logging
+        # import sys
+        # print(logger.getEffectiveLevel())
+        # handler = logging.StreamHandler(sys.stdout)
+        # handler.setLevel(logging.INFO)
+        # utils.LOGGER.addHandler(handler)
         logger.info(text)
 
     def get_patch_dataset(self, train_transforms):
@@ -192,7 +206,7 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
         load_single_images = Compose(
             [
                 LoadImaged(keys=["image"]),
-                EnsureChannelFirstd(keys=["image"]),
+                EnsureChannelFirstd(keys=["image"], channel_dim="no_channel"),
                 Orientationd(keys=["image"], axcodes="PLI"),
                 SpatialPadd(
                     keys=["image"],
@@ -215,14 +229,14 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
         if self.config.do_augmentation:
             train_transforms = Compose(
                 [
-                    ScaleIntensityRanged(
-                        keys=["image"],
-                        a_min=0,
-                        a_max=2000,
-                        b_min=0.0,
-                        b_max=1.0,
-                        clip=True,
-                    ),
+                    # ScaleIntensityRanged(
+                    #     keys=["image"],
+                    #     a_min=0,
+                    #     a_max=2000,
+                    #     b_min=0.0,
+                    #     b_max=1.0,
+                    #     clip=True,
+                    # ),
                     RandShiftIntensityd(keys=["image"], offsets=0.1, prob=0.5),
                     RandFlipd(keys=["image"], spatial_axis=[1], prob=0.5),
                     RandFlipd(keys=["image"], spatial_axis=[2], prob=0.5),
@@ -248,7 +262,7 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
             batch_size=self.config.batch_size,
             shuffle=True,
             num_workers=self.config.num_workers,
-            collate_fn=pad_list_data_collate,
+            # collate_fn=pad_list_data_collate,
         )
 
         if self.config.eval_volume_dict is not None:
@@ -459,9 +473,7 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
                     # Normalize the image
                     for i in range(image_batch.shape[0]):
                         for j in range(image_batch.shape[1]):
-                            image_batch[i, j] = self.normalize_function(
-                                image_batch[i, j]
-                            )
+                            self.normalize(image_batch[i, j], 100., True)
 
                     # Forward pass
                     enc, dec = model(image_batch)
@@ -478,7 +490,7 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
                     elif isinstance(criterionW, nn.BCELoss):
                         reconstruction_loss = criterionW(
                             torch.sigmoid(dec),
-                            utils.remap_image(image_batch, new_max=1),
+                            normalize(image_batch, 100., 0., new_max=1., inplace=False)
                         )
 
                     epoch_rec_loss += reconstruction_loss.item()
@@ -624,9 +636,7 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
                 # normalize val_inputs across channels
                 for i in range(val_inputs.shape[0]):
                     for j in range(val_inputs.shape[1]):
-                        val_inputs[i][j] = self.normalize_function(
-                            val_inputs[i][j]
-                        )
+                        self.normalize(val_inputs[i, j], 100., True)
                 logger.debug(f"Val inputs shape: {val_inputs.shape}")
                 val_outputs = sliding_window_inference(
                     val_inputs,
@@ -655,33 +665,8 @@ class WNetTrainingWorkerColab(TrainingWorkerBase):
                     f"Val decoder outputs shape: {val_decoder_outputs.shape}"
                 )
 
-                # dices = []
-                # Find in which channel the labels are (avoid background)
-                # for channel in range(val_outputs.shape[1]):
-                #     dices.append(
-                #         utils.dice_coeff(
-                #             y_pred=val_outputs[
-                #                 0, channel : (channel + 1), :, :, :
-                #             ],
-                #             y_true=val_labels[0],
-                #         )
-                #     )
-                # logger.debug(f"DICE COEFF: {dices}")
-                # max_dice_channel = torch.argmax(
-                #     torch.Tensor(dices)
-                # )
-                # logger.debug(
-                #     f"MAX DICE CHANNEL: {max_dice_channel}"
-                # )
                 self.dice_metric(
                     y_pred=val_outputs,
-                    # [
-                    #     :,
-                    #     max_dice_channel : (max_dice_channel + 1),
-                    #     :,
-                    #     :,
-                    #     :,
-                    # ],
                     y=val_labels,
                 )
 

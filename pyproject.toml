@@ -1,4 +1,4 @@
-[project]
+project]
 name = "napari_cellseg3d"
 authors = [
     {name = "Cyril Achard", email = "cyril.achard@epfl.ch"},
