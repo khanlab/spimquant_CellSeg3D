@@ -1,9 +1,78 @@
-import argparse
+from napari_cellseg3d.dev_scripts import colab_training as c
+from napari_cellseg3d.config import WNetTrainingWorkerConfig, WandBConfig, WeightsInfo, PRETRAINED_WEIGHTS_DIR
+from napari_cellseg3d import utils
 from spimquant import CellSeg3DModelConfig
+from cvpl_tools.dataset_reference import DatasetReference
+import numpy as np
+import os, shutil
+from pathlib import Path
+import argparse
+import cvpl_tools.strenc as strenc
+import json
 
 
-def get_config():
-    pass
+def main():
+    config = load_config_from_argparse_for_training()
+    train_model(config)
+
+
+def load_config_from_argparse_for_training() -> CellSeg3DModelConfig:
+    parser = argparse.ArgumentParser(description='Example with dictionary')
+    parser.add_argument('--im_channel', type=int, default=0,
+                        help='The channel of input image to train CellSeg3D on')
+    parser.add_argument('--trainset', type=str, default=None,
+                        help='path to the dataset reference file; this is the training set to use')
+    parser.add_argument('--min_brightness', type=float, default=0.,
+                        help='The minimum brightness threshold to clip the input image into')
+    parser.add_argument('--max_brightness', type=float, default=1000.,
+                        help='The maximum brightness threshold to clip the input image into')
+    parser.add_argument('--n_cuts_weight', type=float, default=.5,
+                        help='Weighting of one of the two losses used by CellSeg3D: n cuts loss')
+    parser.add_argument('--rec_loss_weight', type=float, default=.005,
+                        help='Weighting of one of the two losses used by CellSeg3D: reconstruction loss')
+    parser.add_argument('--nepoch', type=int, default=20,
+                        help='The number of epochs to train for')
+    parser.add_argument('--num_classes', type=int, default=.005,
+                        help='The number of output class in the autoencoder representation of CellSeg3D')
+    parser.add_argument('--scratch_folder', type=str, default=None,
+                        help='Path to the scratch folder that can be used for storing intermediate input files.')
+    parser.add_argument('--result_folder', type=str, default=None,
+                        help='Path to the result folder that can be used for storing result files (model weights etc.)')
+    parser.add_argument('--device', type=str, default='cpu', help='device to use for training')
+
+    args = parser.parse_args()
+    with open(args.trainset, 'r') as infile:
+        ref: DatasetReference = json.load(infile, object_hook=strenc.get_decoder_hook())
+    config = CellSeg3DModelConfig(
+        trainset=ref,
+        scratch_folder=args.scratch_folder,
+        result_folder=args.result_folder,
+        im_channel=args.im_channel,
+        input_brightness_range=(args.min_brightness, args.max_brightness),
+        n_cuts_weight=args.n_cuts_weight,
+        rec_loss_weight=args.rec_loss_weight,
+        nepochs=args.nepochs,
+        num_classes=args.num_classes,
+        device=args.device,
+    )
+
+    return config
+
+
+def preprocess_to_3d_tiles(dataset_ref: DatasetReference,
+                           out_prefix, ch, clamp_max, clamp_min=0):
+    """Preprocess a 4d slice (ch, z, y, x) file by selecting one of its channel and turn the volume into
+    3d tiles of a given size;
+    If the tile_width is None, then the slice is not tiled"""
+    akd = dataset_ref.datapoint_refs
+
+    for imid in akd:
+        im = akd[imid].read_as_np(dataset_ref.im_read_setting)
+        if ch is not None:
+            im = im[ch]
+        assert im.ndim == 3, f'Expected end results as 3-d tiles, got {im.ndim}-d tile of shape {im.shape} instead'
+        im = np.clip(im, clamp_min, clamp_max)
+        np.save(f'{out_prefix}/{imid}.npy', im)
 
 
 def train_model(config: CellSeg3DModelConfig):
@@ -17,7 +86,7 @@ def train_model(config: CellSeg3DModelConfig):
 
     clamp_min, clamp_max = config.input_brightness_range
     preprocess_to_3d_tiles(config.trainset, PROCESSED_SLICE_FOLDER,
-                                 config.IM_TRAIN_CHANNEL,
+                                 config.im_channel,
                                  clamp_max, clamp_min)
 
     batch_size = 4
@@ -40,7 +109,7 @@ def train_model(config: CellSeg3DModelConfig):
     global train_config, wandb_config
     train_config = WNetTrainingWorkerConfig(
         device=config.device,
-        max_epochs=config.number_of_epochs,
+        max_epochs=config.nepochs,
         learning_rate=learning_rate,
         validation_interval=validation_frequency,
         batch_size=batch_size,
@@ -75,29 +144,5 @@ def train_model(config: CellSeg3DModelConfig):
     return config
 
 
-def train_channel(channel: int, trainset: DatasetReference, scratch_folder: str, result_folder: str, device: str,
-                  nepoch=20, num_classes=5):
-    if channel == 0:
-        MIN_BRIGHTNESS = 0.
-        MAX_BRIGHTNESS = 1000.
-        rec_loss_weight = .005
-    else:
-        MIN_BRIGHTNESS = 300.
-        MAX_BRIGHTNESS = 1000.
-        rec_loss_weight = .005
-
-    config = CellSeg3DModelConfig(
-        trainset=trainset,
-        scratch_folder=scratch_folder,
-        result_folder=result_folder,
-        IM_TRAIN_CHANNEL=channel,
-        input_brightness_range=(MIN_BRIGHTNESS, MAX_BRIGHTNESS),
-        number_of_epochs=nepoch,
-        n_cuts_weight=.5,
-        rec_loss_weight=rec_loss_weight,
-        rec_loss='MSE',
-        device=device,
-        num_classes=num_classes,
-    )
-    train_model(config)
-    return config
+if __name__ == '__main__':
+    main()
