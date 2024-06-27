@@ -22,12 +22,15 @@ if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/sna
     IM_CHANNEL = csconf['im_channel']
 
 
-def load_OME_ZARR_as_zarr_group(path):
-    import gcsfs
+def load_OME_ZARR_as_zarr_group(path: str):
     import zarr
-    gfs = gcsfs.GCSFileSystem(token=None)
-    store = gfs.get_mapper(path)
-    zarr_group = zarr.open(store, mode='r')
+    if path.strip().startswith('gs:'):  # google cloud storage:
+        import gcsfs
+        gfs = gcsfs.GCSFileSystem(token=None)
+        store = gfs.get_mapper(path)
+        zarr_group = zarr.open(store, mode='r')
+    else:  # local file system
+        zarr_group = zarr.open(path, 'r')
     return zarr_group
 
 
@@ -50,7 +53,7 @@ def init_dataset():
     fs.ensure_dir_exists(dataset_dir, True)
     TOTAL_N = csconf["num_train_chunk"]  # total number of splits we want in the end
     CREATION_INFO = csconf["creation_info"]
-    zarr_group = load_OME_ZARR_as_zarr_group(snakemake.params.zarr)
+    zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
     print(list(zarr_group.keys()))
     zarr_subgroup = zarr_group['0']
 
@@ -147,7 +150,7 @@ def train():
 def inference():
     import predict
     loc = (1024, 1888, 992)
-    zarr_group = load_OME_ZARR_as_zarr_group(snakemake.params.zarr)
+    zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
     zarr_subgroup = zarr_group['0']
     im = da.from_zarr(zarr_subgroup)[IM_CHANNEL, loc[0]:loc[0] + 32,
                 loc[1]:loc[1] + 2048, loc[2]:loc[2] + 2048]
