@@ -1,7 +1,6 @@
 from napari_cellseg3d.dev_scripts import colab_training as c
 from napari_cellseg3d.config import WNetTrainingWorkerConfig, WandBConfig, WeightsInfo, PRETRAINED_WEIGHTS_DIR
 from napari_cellseg3d import utils
-from spimquant import CellSeg3DModelConfig
 from cvpl_tools.dataset_reference import DatasetReference
 import numpy as np
 import os, shutil
@@ -34,7 +33,7 @@ def train_model(config: dict):
     os.mkdir(config["result_folder"])
 
     clamp_min, clamp_max = config["input_brightness_range"]
-    preprocess_to_3d_tiles(config["trainset, PROCESSED_SLICE_FOLDER"],
+    preprocess_to_3d_tiles(config["trainset"], PROCESSED_SLICE_FOLDER,
                                  config["im_channel"],
                                  clamp_max, clamp_min)
 

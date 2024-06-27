@@ -14,11 +14,14 @@ import cvpl_tools.persistence as persistence
 import cvpl_tools.strenc as strenc
 
 
-csconf = snakemake.params.cellsegment
-DEVICE = csconf['device']
-DATASET_NAME = csconf['dataset_name']
-SCRATCH_FOLDER = csconf['scratch_dir']
-IM_CHANNEL = csconf['im_channel']
+if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/snakemake/snakemake/issues/2678
+    csconf = snakemake.params.cellsegment
+    DEVICE = csconf['device']
+    DATASET_NAME = csconf['dataset_name']
+    SCRATCH_FOLDER = csconf['scratch_dir']
+    IM_CHANNEL = csconf['im_channel']
+
+
 def load_OME_ZARR_as_zarr_group(path):
     import gcsfs
     import zarr
@@ -128,8 +131,15 @@ def train():
         'nepochs': csconf['nepochs'],
         'n_cuts_weight': csconf['n_cuts_weight'],
         'rec_loss_weight': csconf['rec_loss_weight'],
-        'device': csconf['device']
+        'device': csconf['device'],
+        'in_channels': 1,
+        'out_channels': 1,
+        'dropout': .65,
+        'rec_loss': 'MSE',
+        'model_weight_path': None,
+        'post_processing_code': None,
     }
+
     config = train.train_model(config)
     persistence.write_dict(config, snakemake.output.model_config)
 
@@ -159,35 +169,15 @@ def inference():
     print('inference image written')
 
 
-@dataclass
-class CellSeg3DModelConfig:
-    trainset: DatasetReference
-    scratch_folder: str  # the folder where intermediate files for training will be written to
-    result_folder: str  # result folder for output
-    in_channels: int = 1
-    out_channels: int = 1
-    num_classes: int = 10
-    dropout: float = 0.65
-    im_channel: int = 0  # the channel of input image to train on
-    input_brightness_range: tuple[float, float] = (0., 1000.)
-    nepochs: int = 5
-    n_cuts_weight: float = .5
-    rec_loss_weight: float = .005
-    rec_loss: str = 'MSE'
-    device: str = 'cpu'
-    model_weight_path: str = None
-    post_processing_code: str = None
-
-
-def create_model(config: CellSeg3DModelConfig):
+def create_model(config: dict):
     model = WNet(
         in_channels=config.in_channels,
         out_channels=config.out_channels,
         num_classes=config.num_classes,
         dropout=config.dropout,
     )
-    model.to(config.device)
-    weights = torch.load(config.model_weight_path, map_location=config.device)
+    model.to(config['device'])
+    weights = torch.load(config['model_weight_path'], map_location=config['device'])
     model.load_state_dict(weights, strict=True)
     return model
 
