@@ -145,27 +145,30 @@ def train():
 
 def inference():
     import predict
-    loc = csconf['predict_range']
+    locs = csconf['predict_range']
     zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
     zarr_subgroup = zarr_group['0']
-    im = da.from_zarr(zarr_subgroup)[IM_CHANNEL, loc[0][0]:loc[0][1],
-                loc[1][0]:loc[1][1], loc[2][0]:loc[2][1]]
 
-    model_config = persistence.read_dict(snakemake.input.model_config)
-    output = predict.inference_on_np3d(model_config, im, [32, 32, 32])
-    print('finished inference')
-    output = output.detach().cpu().numpy()[0]
-    print('output extracted')
-    output_argmax = output.argmax(axis=0)
-    print('argmax computed')
-    result_dir = snakemake.output.pred_result_dir
-    fs.ensure_dir_exists(result_dir, True)
-    np.save(f'{result_dir}/inference.npy', output)
-    print('output written')
-    np.save(f'{result_dir}/inference_argmax.npy', output_argmax)
-    print('argmax written')
-    np.save(f'{result_dir}/inference_im.npy', im)
-    print('inference image written')
+    for i in len(locs):
+        loc = locs[i]
+        im = da.from_zarr(zarr_subgroup)[IM_CHANNEL, loc[0][0]:loc[0][1],
+                    loc[1][0]:loc[1][1], loc[2][0]:loc[2][1]]
+
+        model_config = persistence.read_dict(snakemake.input.model_config)
+        output = predict.inference_on_np3d(model_config, im, [32, 32, 32])
+        print('finished inference')
+        output = output.detach().cpu().numpy()[0]
+        print('output extracted')
+        output_argmax = output.argmax(axis=0)
+        print('argmax computed')
+        result_dir = snakemake.output.pred_result_dir
+        fs.ensure_dir_exists(result_dir, True)
+        np.save(f'{result_dir}/inference_{i}.npy', output)
+        print('output written')
+        np.save(f'{result_dir}/inference_argmax_{i}.npy', output_argmax)
+        print('argmax written')
+        np.save(f'{result_dir}/inference_im_{i}.npy', im)
+        print('inference image written')
 
 
 if __name__ == '__main__':
