@@ -144,11 +144,11 @@ def train():
 
 def inference():
     import predict
-    loc = (1024, 1888, 992)
+    loc = csconf['predict_range']
     zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
     zarr_subgroup = zarr_group['0']
-    im = da.from_zarr(zarr_subgroup)[IM_CHANNEL, loc[0]:loc[0] + 32,
-                loc[1]:loc[1] + 2048, loc[2]:loc[2] + 2048]
+    im = da.from_zarr(zarr_subgroup)[IM_CHANNEL, loc[0][0]:loc[0][1],
+                loc[1][0]:loc[1][1], loc[2][0]:loc[2][1]]
 
     model_config = persistence.read_dict(snakemake.input.model_config)
     output = predict.inference_on_np3d(model_config, im, [32, 32, 32])
