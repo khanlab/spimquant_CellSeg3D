@@ -11,10 +11,11 @@ import cvpl_tools.persistence as persistence
 
 if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/snakemake/snakemake/issues/2678
     csconf = snakemake.params.cellsegment
-    DEVICE = csconf['device']
     DATASET_NAME = csconf['dataset_name']
-    SCRATCH_FOLDER = csconf['scratch_dir']
-    IM_CHANNEL = csconf['im_channel']
+    if 'device' in csconf:
+        DEVICE = csconf['device']
+        SCRATCH_FOLDER = csconf['scratch_dir']
+        IM_CHANNEL = csconf['im_channel']
 
 
 def load_OME_ZARR_as_zarr_group(path: str):
