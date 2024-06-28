@@ -149,7 +149,7 @@ def inference():
     zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
     zarr_subgroup = zarr_group['0']
 
-    for i in len(locs):
+    for i in range(len(locs)):
         loc = locs[i]
         im = da.from_zarr(zarr_subgroup)[IM_CHANNEL, loc[0][0]:loc[0][1],
                     loc[1][0]:loc[1][1], loc[2][0]:loc[2][1]]
