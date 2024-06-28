@@ -1,7 +1,5 @@
 from napari_cellseg3d.code_models.models.wnet.model import WNet
 import torch
-from cvpl_tools.dataset_reference import DatasetReference
-from dataclasses import dataclass
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +9,6 @@ import cvpl_tools.fs as fs
 import cvpl_tools.dataset_reference as dataset_reference
 from cvpl_tools.array_key_dict import ArrayKeyDict
 import cvpl_tools.persistence as persistence
-import cvpl_tools.strenc as strenc
 
 
 if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/snakemake/snakemake/issues/2678
@@ -170,19 +167,6 @@ def inference():
     print('argmax written')
     np.save(f'{result_dir}/inference_im.npy', im)
     print('inference image written')
-
-
-def create_model(config: dict):
-    model = WNet(
-        in_channels=config.in_channels,
-        out_channels=config.out_channels,
-        num_classes=config.num_classes,
-        dropout=config.dropout,
-    )
-    model.to(config['device'])
-    weights = torch.load(config['model_weight_path'], map_location=config['device'])
-    model.load_state_dict(weights, strict=True)
-    return model
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 import torch
-from spimquant import create_model
+from create_model import create_model
 from napari_cellseg3d.func_variants import normalize
 from monai.inferers import sliding_window_inference
 import numpy as np
