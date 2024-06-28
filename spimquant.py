@@ -1,5 +1,3 @@
-from napari_cellseg3d.code_models.models.wnet.model import WNet
-import torch
 import os
 import matplotlib.pyplot as plt
 import numpy as np
