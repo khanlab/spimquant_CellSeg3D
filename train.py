@@ -24,7 +24,8 @@ def preprocess_to_3d_tiles(dataset_ref: DatasetReference,
 
 
 def train_model(config: dict):
-    PROCESSED_SLICE_FOLDER = f'{config["scratch_folder"]}/cellseg3d_train_inputs'
+    dataset_ref: DatasetReference = config["trainset"]
+    PROCESSED_SLICE_FOLDER = f'{config["scratch_folder"]}/{dataset_ref.name}'
     if os.path.exists(PROCESSED_SLICE_FOLDER):
         shutil.rmtree(PROCESSED_SLICE_FOLDER)
     os.mkdir(PROCESSED_SLICE_FOLDER)
@@ -33,7 +34,7 @@ def train_model(config: dict):
     os.mkdir(config["result_folder"])
 
     clamp_min, clamp_max = config["input_brightness_range"]
-    preprocess_to_3d_tiles(config["trainset"], PROCESSED_SLICE_FOLDER,
+    preprocess_to_3d_tiles(dataset_ref, PROCESSED_SLICE_FOLDER,
                                  config["im_channel"],
                                  clamp_max, clamp_min)
 
