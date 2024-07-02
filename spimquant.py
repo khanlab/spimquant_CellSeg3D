@@ -49,7 +49,7 @@ def init_dataset():
     fs.ensure_dir_exists(dataset_dir, True)
     TOTAL_N = csconf["num_train_chunk"]  # total number of splits we want in the end
     CREATION_INFO = csconf["creation_info"]
-    zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
+    zarr_group = load_OME_ZARR_as_zarr_group(snakemake.input.zarr)
     print(list(zarr_group.keys()))
     zarr_subgroup = zarr_group['0']
 
@@ -146,7 +146,7 @@ def train():
 def inference():
     import predict
     locs = csconf['predict_range']
-    zarr_group = load_OME_ZARR_as_zarr_group(csconf['zarr'])
+    zarr_group = load_OME_ZARR_as_zarr_group(snakemake.input.zarr)
     zarr_subgroup = zarr_group['0']
 
     model_config = persistence.read_dict(snakemake.input.model_config)
