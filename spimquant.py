@@ -18,6 +18,13 @@ if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/sna
         SCRATCH_FOLDER = csconf['scratch_dir']
 
 
+def get_zarr_path():
+    zarr_path = snakemake.params.zarr.replace('\\', '/')
+    if zarr_path.startswith('gs:/') and zarr_path[4] != '/':
+        zarr_path = "gs://" + zarr_path[4:]
+    return zarr_path
+
+
 def load_OME_ZARR_as_zarr_group(path: str):
     import zarr
     if path.strip().startswith('gs:'):  # google cloud storage:
@@ -49,7 +56,8 @@ def init_dataset():
     fs.ensure_dir_exists(dataset_dir, True)
     TOTAL_N = csconf["num_train_chunk"]  # total number of splits we want in the end
     CREATION_INFO = csconf["creation_info"]
-    zarr_group = load_OME_ZARR_as_zarr_group(snakemake.params.zarr)
+
+    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
     print(list(zarr_group.keys()))
     zarr_subgroup = zarr_group['0']
 
@@ -146,7 +154,7 @@ def train():
 def inference():
     import predict
     locs = csconf['predict_range']
-    zarr_group = load_OME_ZARR_as_zarr_group(snakemake.params.zarr)
+    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
     zarr_subgroup = zarr_group['0']
 
     model_config = persistence.read_dict(snakemake.input.model_config)
