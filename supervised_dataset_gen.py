@@ -239,6 +239,7 @@ def init_supervised_dataset(csconf):
     3. Common region slice
     4. Olfactory bulb slice
     5. Edge slice
+    6. A slice imaged blurry
     """
     dataset_types = ('train_random_sample', 'test_random_sample', 'slice_common',
                      'slice_edge', 'slice_olfactory_bulb', 'slice_blurry')
