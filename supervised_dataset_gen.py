@@ -118,6 +118,7 @@ def grab_splits_from_large_slice(
         np.save(save_path, split)
         if pred_params is not None:
             output = predict.inference_on_np3d(model_config, split[IM_CHANNEL], [32, 32, 32], model=model)
+            output = output[3] > .2  # TODO: Remove this line
             pred_save_path = f'{pred_dataset_dir}/{imid}.npy'
             np.save(pred_save_path, output)
             pred_slice_arr[imid] = pred_save_path
