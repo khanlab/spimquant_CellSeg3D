@@ -268,9 +268,10 @@ def init_supervised_dataset(csconf):
                 ds_info = dataset_infos[i]
                 ds_loc = dataset_locs[i]
                 dataset_name = f'{sz_prefix}_{channel_str}_{ds_type}'
+                im_dataset_dir = f'{dataset_dir}/{dataset_name}_im'
                 pred_params = {
                     'model_config_path': snakemake.input.model_config,
-                    'pred_dataset_dir': f'{dataset_dir}/{dataset_name}'
+                    'pred_dataset_dir': f'{dataset_dir}/{dataset_name}_cellseg3d'
                 }
 
                 SPLIT_SIZES = np.array((sz, ) * 3, dtype=np.int32)
@@ -289,7 +290,7 @@ def init_supervised_dataset(csconf):
                     SPLIT_SIZES=SPLIT_SIZES,
                     LOOP_PER_LD=LOOP_PER_LD,
                     IM_CHANNEL=im_channel,
-                    out_dataset_dir=dataset_dir,
+                    out_dataset_dir=im_dataset_dir,
                     TOTAL_N=nsplits,
                     CLIP_MIN=0,
                     CLIP_MAX=1000,
