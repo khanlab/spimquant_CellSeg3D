@@ -21,7 +21,6 @@ if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/sna
 
 def main():
     import sys
-    sys.path.append('../../..//spimquant/submodules/spimquant_cellpose')
     cmd = snakemake.params.command
     if cmd == 'init_dataset':
         init_dataset(csconf)

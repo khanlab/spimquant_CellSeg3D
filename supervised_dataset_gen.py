@@ -222,7 +222,7 @@ def init_dataset(csconf):
     )
 
 
-def init_supervised_dataset():
+def init_supervised_dataset(csconf):
     dataset_dir = snakemake.output.dataset_dir
     fs.ensure_dir_exists(dataset_dir, True)
 
@@ -297,3 +297,11 @@ def init_supervised_dataset():
                     ld_start=ds_loc,
                     pred_params=pred_params
                 )
+
+
+def main():
+    init_supervised_dataset(csconf)
+
+
+if __name__ == '__main__':
+    main()
