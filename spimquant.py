@@ -7,6 +7,7 @@ import cvpl_tools.fs as fs
 import cvpl_tools.dataset_reference as dataset_reference
 from cvpl_tools.array_key_dict import ArrayKeyDict
 import cvpl_tools.persistence as persistence
+from supervised_dataset_gen import init_dataset, get_zarr_path, load_OME_ZARR_as_zarr_group
 
 
 if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/snakemake/snakemake/issues/2678
@@ -18,100 +19,18 @@ if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/sna
         SCRATCH_FOLDER = csconf['scratch_dir']
 
 
-def get_zarr_path():
-    zarr_path = snakemake.params.zarr.replace('\\', '/')
-    if zarr_path.startswith('gs:/') and zarr_path[4] != '/':
-        zarr_path = "gs://" + zarr_path[4:]
-    return zarr_path
-
-
-def load_OME_ZARR_as_zarr_group(path: str):
-    import zarr
-    if path.strip().startswith('gs:'):  # google cloud storage:
-        import gcsfs
-        gfs = gcsfs.GCSFileSystem(token=None)
-        store = gfs.get_mapper(path)
-        zarr_group = zarr.open(store, mode='r')
-    else:  # local file system
-        zarr_group = zarr.open(path, 'r')
-    return zarr_group
-
-
 def main():
     import sys
     sys.path.append('../../..//spimquant/submodules/spimquant_cellpose')
     cmd = snakemake.params.command
     if cmd == 'init_dataset':
-        init_dataset()
+        init_dataset(csconf)
     elif cmd == 'train':
         train()
     elif cmd == 'predict':
         inference()
     else:
         raise ValueError(f'ERROR: Snakemake command is not recognized: {snakemake.command}')
-
-
-def init_dataset():
-    dataset_dir = snakemake.output.dataset_dir
-    fs.ensure_dir_exists(dataset_dir, True)
-    TOTAL_N = csconf["num_train_chunk"]  # total number of splits we want in the end
-    CREATION_INFO = csconf["creation_info"]
-
-    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
-    print(list(zarr_group.keys()))
-    zarr_subgroup = zarr_group['0']
-
-    zarr_shape = np.array(zarr_subgroup.shape, dtype=np.int32)
-    print(zarr_shape)
-    LD_SIZES = np.array(csconf["ld_size"], dtype=np.int32)
-    SPLIT_SIZES = np.array(csconf["train_chunk_size"], dtype=np.int32)
-    LD_BY_SPLIT = LD_SIZES // SPLIT_SIZES
-    LOOP_PER_LD = csconf["num_chunk_per_ld"]  # from each LD slice, we attempt to read this many splits
-
-    slice_arr = ArrayKeyDict()
-    LD_RNG = ((zarr_shape[1:] - 1) // LD_SIZES) + 1
-    READ_N = 0
-    im = np.zeros((2, LD_SIZES[0], LD_SIZES[1], LD_SIZES[2]), dtype=np.uint16)
-    while True:
-        rng = np.random.randint(0, LD_RNG)
-        ld_start = rng * LD_SIZES
-        ld_end = ld_start + LD_SIZES
-        result_im = da.from_zarr(zarr_subgroup)[:, ld_start[0]:ld_end[0], ld_start[1]:ld_end[1], ld_start[2]:ld_end[2]]
-        result_im = result_im.compute()
-        im[:result_im.shape[0], :result_im.shape[1], :result_im.shape[2], :result_im.shape[3]] = result_im
-        print(f'Computed slice at location {ld_start}')
-        for i in range(LOOP_PER_LD):
-            rng2 = np.random.randint(0, LD_BY_SPLIT)
-            split_start = rng2 * SPLIT_SIZES
-            global_start = ld_start + split_start
-            imid = f'{global_start[0].item()}_{global_start[1].item()}_{global_start[2].item()}'
-            if imid in slice_arr:
-                continue
-            split_end = split_start + SPLIT_SIZES
-            split = im[:, split_start[0]:split_end[0], split_start[1]:split_end[1], split_start[2]:split_end[2]]
-            split = np.clip(split, 0, 1000)
-            if np.var(split[IM_CHANNEL]) < 1000.:  # too little variation, really nothing is here
-                continue
-
-            save_path = f'{dataset_dir}/{imid}.npy'
-            slice_arr[imid] = dataset_reference.DatapointReference(save_path)
-            READ_N += 1
-            np.save(save_path, split)
-            if READ_N >= TOTAL_N:
-                break
-        print(f'Finished sampling splits from slice with READ_N={READ_N}')
-        if READ_N >= TOTAL_N:
-            break
-    im_read_setting = fs.ImReadSetting(
-        true_im_ndim=4,
-        im_format=fs.ImFileType.FORMAT_UINT16)
-    ref = dataset_reference.DatasetReference.new(
-        slice_arr,
-        DATASET_NAME,
-        CREATION_INFO,
-        im_read_setting
-    )
-    persistence.write_dataset_reference(ref, f'{dataset_dir}/DatasetReference')
 
 
 def train():
