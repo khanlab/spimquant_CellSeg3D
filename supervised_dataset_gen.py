@@ -63,7 +63,19 @@ def grab_splits_from_large_slice(
     if slice_arr is None:
         slice_arr = ArrayKeyDict()
 
-    fs.ensure_dir_exists(out_dataset_dir, True)
+    RM_IF_EXISTS = False
+    fs.ensure_dir_exists(out_dataset_dir, RM_IF_EXISTS)
+    if pred_params is not None:
+        import predict
+        pred_dataset_dir = pred_params['pred_dataset_dir']
+        fs.ensure_dir_exists(pred_dataset_dir, RM_IF_EXISTS)
+
+        model_config = persistence.read_dict(pred_params['model_config_path'])
+        model = predict.create_model(model_config)
+        if 'slice_arr' in pred_params:
+            pred_slice_arr = pred_params['slice_arr']
+        else:
+            pred_slice_arr = ArrayKeyDict()
 
     LD_BY_SPLIT = LD_SIZES // SPLIT_SIZES
     zarr_shape = np.array(zarr_subgroup.shape, dtype=np.int32)
@@ -90,16 +102,6 @@ def grab_splits_from_large_slice(
             for i in range(LOOP_PER_LD):
                 yield np.random.randint(0, LD_BY_SPLIT)
 
-    if pred_params is not None:
-        import predict
-        model_config = persistence.read_dict(pred_params['model_config_path'])
-        model = predict.create_model(model_config)
-        pred_dataset_dir = pred_params['pred_dataset_dir']
-        if 'slice_arr' in pred_params:
-            pred_slice_arr = pred_params['slice_arr']
-        else:
-            pred_slice_arr = ArrayKeyDict()
-
     for rng2 in loop_over():
         split_start = rng2 * SPLIT_SIZES
         global_start = ld_start + split_start
@@ -118,7 +120,8 @@ def grab_splits_from_large_slice(
         np.save(save_path, split)
         if pred_params is not None:
             output = predict.inference_on_np3d(model_config, split[IM_CHANNEL], [32, 32, 32], model=model)
-            output = output[3] > .2  # TODO: Remove this line
+            output = output.detach().cpu().numpy()[0]
+            output = output[3] > .2  # TODO: Remove these two lines
             pred_save_path = f'{pred_dataset_dir}/{imid}.npy'
             np.save(pred_save_path, output)
             pred_slice_arr[imid] = pred_save_path
@@ -149,6 +152,10 @@ def grab_splits_from_large_slices_as_dataset(
         pred_params = copy.deepcopy(pred_params)
         pred_params['slice_arr'] = ArrayKeyDict()
     while True:
+        if TOTAL_N is None:
+            to_read = None
+        else:
+            to_read = TOTAL_N - READ_N
         splits_read = grab_splits_from_large_slice(
             zarr_subgroup=zarr_subgroup,
             LD_SIZES=LD_SIZES,
@@ -157,15 +164,16 @@ def grab_splits_from_large_slices_as_dataset(
             IM_CHANNEL=IM_CHANNEL,
             out_dataset_dir=out_dataset_dir,
             slice_arr=slice_arr,
-            MAX_N=TOTAL_N - READ_N,
+            MAX_N=to_read,
             CLIP_MIN=CLIP_MIN,
             CLIP_MAX=CLIP_MAX,
             MIN_SLICE_VAR=MIN_SLICE_VAR,
-            ld_start=ld_start
+            ld_start=ld_start,
+            pred_params=pred_params
         )
         READ_N += splits_read
         print(f'Finished sampling splits from slice with READ_N={READ_N}')
-        if READ_N >= TOTAL_N:
+        if LOOP_PER_LD is None or TOTAL_N is None or READ_N >= TOTAL_N:
             break
     im_read_setting = fs.ImReadSetting(
         true_im_ndim=4,
@@ -261,7 +269,7 @@ def init_supervised_dataset(csconf):
         (1344, 4608, 2048)
     )
 
-    for sz, nsplits in ((32, 1024), (64, 256)):
+    for sz, nsplits in ((64, 512), ):
         sz_prefix = f'sz{sz}'
         for im_channel in range(2):
             channel_str = f'ch{im_channel}'
@@ -278,7 +286,7 @@ def init_supervised_dataset(csconf):
 
                 SPLIT_SIZES = np.array((sz, ) * 3, dtype=np.int32)
                 if ds_loc is None:
-                    LOOP_PER_LD = sz // 16
+                    LOOP_PER_LD = nsplits // 4
                     LD_SIZES = np.array((sz, 2048, 2048), dtype=np.int32)
                 else:
                     LOOP_PER_LD = None
@@ -308,3 +316,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
