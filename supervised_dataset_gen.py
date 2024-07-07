@@ -271,7 +271,7 @@ def init_supervised_dataset(csconf):
 
     for sz, nsplits in ((64, 512), ):
         sz_prefix = f'sz{sz}'
-        for im_channel in range(2):
+        for im_channel in range(1, 2):
             channel_str = f'ch{im_channel}'
             for i in range(len(dataset_types)):
                 ds_type = dataset_types[i]
@@ -286,7 +286,10 @@ def init_supervised_dataset(csconf):
 
                 SPLIT_SIZES = np.array((sz, ) * 3, dtype=np.int32)
                 if ds_loc is None:
-                    LOOP_PER_LD = nsplits // 4
+                    if im_channel == 0:
+                        LOOP_PER_LD = nsplits // 4
+                    else:
+                        LOOP_PER_LD = nsplits // 2
                     LD_SIZES = np.array((sz, 2048, 2048), dtype=np.int32)
                 else:
                     LOOP_PER_LD = None

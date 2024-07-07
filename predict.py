@@ -20,10 +20,10 @@ def inference_on_np_batch(config: dict, im3d_np_batch, roi_size, model=None):
             for i in range(val_inputs.shape[0]):
                 for j in range(val_inputs.shape[1]):
                     im_min, im_max = val_inputs.min(), val_inputs.max()
-                    normalize(val_inputs[i, j], im_max=im_max, im_min=im_min, inplace=True)
+                    normalize(val_inputs[i, j], im_max=im_max, im_min=im_min, new_max=1., inplace=True)
         else:
             im_min, im_max = rg
-            normalize(val_inputs, im_max=im_max, im_min=im_min, inplace=True)
+            normalize(val_inputs, im_max=im_max, im_min=im_min, new_max=1, inplace=True)
         val_outputs = sliding_window_inference(
             val_inputs,
             roi_size=roi_size,
