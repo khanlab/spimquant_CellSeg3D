@@ -23,7 +23,7 @@ def main():
     import sys
     cmd = snakemake.params.command
     if cmd == 'init_dataset':
-        init_dataset(csconf)
+        init_dataset(csconf, snakemake=snakemake)
     elif cmd == 'train':
         train()
     elif cmd == 'predict':

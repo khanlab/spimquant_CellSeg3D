@@ -203,7 +203,7 @@ def grab_splits_from_large_slices_as_dataset(
 """--------------------------------Part 2: Interfaces-------------------------------------"""
 
 
-def init_dataset(csconf):
+def init_dataset(csconf, snakemake):
     zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
     print(list(zarr_group.keys()))
     zarr_subgroup = zarr_group['0']
