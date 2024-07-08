@@ -9,7 +9,7 @@ import skimage
 import skimage.morphology as morph
 import sys
 import cvpl_tools.persistence as persistence
-from spimquant.workflow.scripts.np_algs import CountFromMask_Watershed, NCellFromInst_BySize
+from cvpl_tools.np_algs import CountFromMask_Watershed, NCellFromInst_BySize
 from napari_cellseg3d.func_variants import normalize
 import random
 
