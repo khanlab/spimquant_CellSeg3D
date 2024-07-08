@@ -14,8 +14,8 @@ if __name__ == '__main__':  # Avoids the bug mentioned in https://github.com/sna
 """--------------------------------Part 1: Implementation--------------------------------"""
 
 
-def get_zarr_path():
-    zarr_path = snakemake.params.zarr.replace('\\', '/')
+def get_zarr_path(zarr_url):
+    zarr_path = zarr_url.replace('\\', '/')
     if zarr_path.startswith('gs:/') and zarr_path[4] != '/':
         zarr_path = "gs://" + zarr_path[4:]
     return zarr_path
@@ -204,7 +204,7 @@ def grab_splits_from_large_slices_as_dataset(
 
 
 def init_dataset(csconf, snakemake):
-    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
+    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path(snakemake.params.zarr))
     print(list(zarr_group.keys()))
     zarr_subgroup = zarr_group['0']
     zarr_shape = np.array(zarr_subgroup.shape, dtype=np.int32)
@@ -235,7 +235,7 @@ def init_supervised_dataset(csconf):
     dataset_dir = snakemake.output.dataset_dir
     fs.ensure_dir_exists(dataset_dir, True)
 
-    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
+    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path(snakemake.params.zarr))
     print(list(zarr_group.keys()))
     zarr_subgroup = zarr_group['0']
     zarr_shape = np.array(zarr_subgroup.shape, dtype=np.int32)
