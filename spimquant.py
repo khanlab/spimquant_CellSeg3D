@@ -23,7 +23,7 @@ def main():
     import sys
     cmd = snakemake.params.command
     if cmd == 'init_dataset':
-        init_dataset(csconf)
+        init_dataset(csconf, snakemake=snakemake)
     elif cmd == 'train':
         train()
     elif cmd == 'predict':
@@ -72,7 +72,7 @@ def train():
 def inference():
     import predict
     locs = csconf['predict_range']
-    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path())
+    zarr_group = load_OME_ZARR_as_zarr_group(get_zarr_path(snakemake.params.zarr))
     zarr_subgroup = zarr_group['0']
 
     model_config = persistence.read_dict(snakemake.input.model_config)
