@@ -26,9 +26,11 @@ def normalize(
                 im_view = image.reshape(-1)
         else:
             # torch tensor
-            if not inplace:
+            if inplace:
+                im_view = image.view(-1)
+            else:
                 image = torch.clone(image)
-            im_view = image.view(-1)
+                im_view = image.reshape(-1)
         for i in range(0, len(im_view), batch_size):
             iend = i + batch_size
             im_view[i:iend] = (im_view[i:iend] - im_min) / (im_max - im_min)
