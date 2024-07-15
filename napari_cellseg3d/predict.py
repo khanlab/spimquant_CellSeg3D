@@ -1,20 +1,15 @@
 import torch
-from create_model import create_model
+from napari_cellseg3d.create_model import create_model
 from napari_cellseg3d.func_variants import normalize
 from monai.inferers import sliding_window_inference
 import numpy as np
 
 
-def inference_on_np_batch(config: dict, im3d_np_batch, roi_size, model=None):
-    """
-    im3d_np is 5d array convertible to float32, its dimensions are (batch, in_channel, z, y, x)
-    """
+def inference_on_torch_batch(config: dict, val_inputs, roi_size, model=None) -> torch.Tensor:
     if model is None:
         model = create_model(config)
     with torch.no_grad():
         model.eval()
-        val_data = np.float32(im3d_np_batch)
-        val_inputs = torch.from_numpy(val_data).to(config['device'])
         rg = config['input_brightness_range']
         if rg is None:
             for i in range(val_inputs.shape[0]):
@@ -47,7 +42,16 @@ def inference_on_np_batch(config: dict, im3d_np_batch, roi_size, model=None):
         return val_outputs
 
 
-def inference_on_np3d(config: dict, im3d_np, roi_size, model=None):
+def inference_on_np_batch(config: dict, im3d_np_batch, roi_size, model=None) -> torch.Tensor:
+    """
+    im3d_np is 5d array convertible to float32, its dimensions are (batch, in_channel, z, y, x)
+    """
+    val_data = np.float32(im3d_np_batch)
+    val_inputs = torch.from_numpy(val_data).to(config['device'])
+    return inference_on_torch_batch(config, val_inputs, roi_size, model)
+
+
+def inference_on_np3d(config: dict, im3d_np, roi_size, model=None) -> torch.Tensor:
     """
     im3d_np is 3d array convertible to float32, its dimensions are (z, y, x)
     """

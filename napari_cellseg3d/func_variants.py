@@ -9,7 +9,7 @@ def normalize(
     im_min,
     new_max=100,
     new_min=0,
-    batch_size=16384,
+    batch_size=262144,
     inplace=False,
 ):
     """Modified from CellSeg3D/napari_cellseg3d/utils.py for low mem inference; in place normalize
