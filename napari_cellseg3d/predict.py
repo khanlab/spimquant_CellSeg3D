@@ -1,3 +1,5 @@
+from typing import Sequence
+
 import torch
 from napari_cellseg3d.create_model import create_model
 from napari_cellseg3d.func_variants import normalize
@@ -5,7 +7,22 @@ from monai.inferers import sliding_window_inference
 import numpy as np
 
 
-def inference_on_torch_batch(config: dict, val_inputs, roi_size, model=None) -> torch.Tensor:
+def inference_on_torch_batch(config: dict,
+                             val_inputs: torch.Tensor,
+                             roi_size: Sequence[int],
+                             model=None,
+                             var_filter=3.) -> torch.Tensor:
+    """
+    inference on a batch of 3d images (represented as a 5D tensor (B, C, Z, Y, X) where C is channel)
+    Args
+        config - The model config specifying model settings, and path to model file if model is not provided
+        val_inputs - Input tensor
+        roi_size - inference window size
+        model - The CellSeg3D model object to use as predictor
+        var_filter - image patches with variance lower than this will be skipped and predicted as 0s
+    Returns
+        result probability density tensor (5D) with axis order (B, C, Z, Y, X) where C is predicted class
+    """
     if model is None:
         model = create_model(config)
     with torch.no_grad():
@@ -15,30 +32,31 @@ def inference_on_torch_batch(config: dict, val_inputs, roi_size, model=None) -> 
             for i in range(val_inputs.shape[0]):
                 for j in range(val_inputs.shape[1]):
                     im_min, im_max = val_inputs.min(), val_inputs.max()
-                    val_inputs[i, j] = normalize(val_inputs[i, j], im_max=im_max, im_min=im_min, new_max=1., inplace=False)
+                    val_inputs[i, j] = normalize(val_inputs[i, j], im_max=im_max, im_min=im_min, new_max=1.,
+                                                 inplace=False)
         else:
             im_min, im_max = rg
             val_inputs = normalize(val_inputs, im_max=im_max, im_min=im_min, new_max=1, inplace=False)
+
+        def predictor(im) -> torch.Tensor:
+            nonlocal var_filter
+            if im.var() < var_filter:  # skip predictions on empty spaces
+                pred = torch.zeros((val_inputs.shape[0], config['num_classes']) + im.shape[2:],
+                                   device=config['device'], dtype=torch.float32)
+            else:
+                pred = model.forward_encoder(im)
+            return pred
+
         val_outputs = sliding_window_inference(
             val_inputs,
             roi_size=roi_size,
             sw_batch_size=1,
-            predictor=model.forward_encoder,
+            predictor=predictor,
             overlap=0.1,
             mode="gaussian",
             sigma_scale=0.01,
             progress=True,
         )
-        # val_decoder_outputs = sliding_window_inference(
-        #     val_outputs,
-        #     roi_size=roi_size,
-        #     sw_batch_size=1,
-        #     predictor=model.forward_decoder,
-        #     overlap=0.1,
-        #     mode="gaussian",
-        #     sigma_scale=0.01,
-        #     progress=True,
-        # )
         return val_outputs
 
 
