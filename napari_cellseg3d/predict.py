@@ -41,7 +41,7 @@ def inference_on_torch_batch(config: dict,
 
         def predictor(im) -> torch.Tensor:
             nonlocal var_filter
-            if (im < var_filter[0]).sum() / float(im.size) > var_filter[1]:  # skip predictions on empty spaces
+            if (im < var_filter[0]).sum() / float(im.size()) > var_filter[1]:  # skip predictions on empty spaces
                 pred = torch.zeros((val_inputs.shape[0], config['num_classes']) + im.shape[2:],
                                    device=config['device'], dtype=torch.float32)
             else:
