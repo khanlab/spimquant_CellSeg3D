@@ -11,7 +11,7 @@ def inference_on_torch_batch(config: dict,
                              val_inputs: torch.Tensor,
                              roi_size: Sequence[int],
                              model=None,
-                             var_filter=(100., .9995)) -> torch.Tensor:
+                             var_filter=(250., .9995)) -> torch.Tensor:
     """
     inference on a batch of 3d images (represented as a 5D tensor (B, C, Z, Y, X) where C is channel)
     Args
