@@ -11,7 +11,7 @@ def inference_on_torch_batch(config: dict,
                              val_inputs: torch.Tensor,
                              roi_size: Sequence[int],
                              model=None,
-                             var_filter=3.) -> torch.Tensor:
+                             var_filter=(100., .9995)) -> torch.Tensor:
     """
     inference on a batch of 3d images (represented as a 5D tensor (B, C, Z, Y, X) where C is channel)
     Args
@@ -19,7 +19,8 @@ def inference_on_torch_batch(config: dict,
         val_inputs - Input tensor
         roi_size - inference window size
         model - The CellSeg3D model object to use as predictor
-        var_filter - image patches with variance lower than this will be skipped and predicted as 0s
+        var_filter - a tuple (brightness, portion) image patches with portion of value less than brightness
+            greather than portion are treated as empty spaces and predicted as 0s w/o calling CellSeg3D predictor
     Returns
         result probability density tensor (5D) with axis order (B, C, Z, Y, X) where C is predicted class
     """
@@ -40,7 +41,7 @@ def inference_on_torch_batch(config: dict,
 
         def predictor(im) -> torch.Tensor:
             nonlocal var_filter
-            if im.var() < var_filter:  # skip predictions on empty spaces
+            if (im < var_filter[0]).sum() / float(im.size) > var_filter[1]:  # skip predictions on empty spaces
                 pred = torch.zeros((val_inputs.shape[0], config['num_classes']) + im.shape[2:],
                                    device=config['device'], dtype=torch.float32)
             else:
